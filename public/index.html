@@ -403,17 +403,21 @@
             display: inline-block;
             margin-top: 10px;
             max-width: 100%;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
 
         .qr-code img {
             max-width: 100%;
             height: auto;
+            display: block;
+            margin: 0 auto;
         }
 
         @media (max-width: 480px) {
             .qr-code {
                 padding: 10px;
                 margin-top: 8px;
+                max-width: 200px;
             }
         }
 
@@ -439,6 +443,11 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
+        .qr-toggle:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .progress {
             width: 100%;
             height: 8px;
@@ -456,6 +465,47 @@
             width: 0%;
         }
 
+        /* QR Code Loading Animation */
+        .qr-loading {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: qr-spin 1s ease-in-out infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes qr-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .qr-loading-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        @media (max-width: 480px) {
+            .qr-loading-container {
+                padding: 15px;
+                margin-top: 8px;
+            }
+
+            .qr-loading {
+                width: 30px;
+                height: 30px;
+                border-width: 3px;
+                margin: 15px auto;
+            }
+        }
+
         @keyframes pulse {
 
             0%,
@@ -470,6 +520,20 @@
 
         .loading {
             animation: pulse 1.5s infinite;
+        }
+
+        /* Responsive QR Code Container */
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 480px) {
+            .qr-container {
+                margin-top: 8px;
+            }
         }
     </style>
 </head>
@@ -633,13 +697,13 @@
                             </button>
                         </div>
                         
-
-                        
                         <div class="qr-section">
-                            <button class="qr-toggle" onclick="toggleQR('${fullDownloadUrl}')">
+                            <button class="qr-toggle" onclick="toggleQR('${fullDownloadUrl}')" id="qrToggleBtn">
                                 📱 Show QR Code
                             </button>
-                            <div id="qrCode" style="display: none;"></div>
+                            <div class="qr-container">
+                                <div id="qrCode" style="display: none;"></div>
+                            </div>
                         </div>
                     </div>
                     
@@ -719,20 +783,64 @@
             }
         }
 
-        // QR Code functionality
-        function toggleQR(url) {
+        // Enhanced QR Code functionality with loading animation
+        async function toggleQR(url) {
             const qrCode = document.getElementById('qrCode');
-            const button = event.target;
+            const button = document.getElementById('qrToggleBtn');
 
             if (qrCode.style.display === 'none') {
-                // Generate QR code using QR Server API
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
-                qrCode.innerHTML = `<div class="qr-code"><img src="${qrUrl}" alt="QR Code" style="max-width: 200px; height: auto;"></div>`;
+                // Show loading animation
+                button.disabled = true;
+                button.textContent = '⏳ Generating...';
+
+                qrCode.innerHTML = `
+                    <div class="qr-loading-container">
+                        <div class="qr-loading"></div>
+                    </div>
+                `;
                 qrCode.style.display = 'block';
-                button.textContent = '🔼 Hide QR Code';
+
+                try {
+                    // Simulate loading delay and generate QR code
+                    await new Promise(resolve => setTimeout(resolve, 800)); // Small delay for better UX
+
+                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+
+                    // Create image element and wait for it to load
+                    const img = new Image();
+
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = qrUrl;
+                    });
+
+                    // Show the QR code
+                    qrCode.innerHTML = `
+                        <div class="qr-code">
+                            <img src="${qrUrl}" alt="QR Code" style="max-width: 200px; height: auto;">
+                        </div>
+                    `;
+
+                    button.textContent = '🔼 Hide QR Code';
+
+                } catch (error) {
+                    console.error('Error loading QR code:', error);
+                    qrCode.innerHTML = `
+                        <div class="qr-code" style="background: #ff6b6b; color: white; padding: 20px;">
+                            <p>❌ Failed to load QR code</p>
+                            <p style="font-size: 12px; margin-top: 5px;">Please try again</p>
+                        </div>
+                    `;
+                    button.textContent = '📱 Show QR Code';
+                } finally {
+                    button.disabled = false;
+                }
+
             } else {
                 qrCode.style.display = 'none';
                 button.textContent = '📱 Show QR Code';
+                button.disabled = false;
             }
         }
 
