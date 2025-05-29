@@ -1,0 +1,31 @@
+{
+  "name": "upload",
+  "version": "1.0.0",
+  "description": "A file upload and download service with shareable links",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "file-upload",
+    "file-download",
+    "express",
+    "multer",
+    "file-sharing"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "express": "^5.1.0",
+    "multer": "^2.0.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

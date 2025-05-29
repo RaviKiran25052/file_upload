@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload & Download Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px 20px;
+            margin: 30px 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: linear-gradient(45deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: linear-gradient(45deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            transform: translateY(-2px);
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: linear-gradient(45deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #999;
+            font-size: 14px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            min-width: 120px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .file-list {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .file-item {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .result.success {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+
+        .result.error {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+
+        .download-link {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 20px;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .download-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .share-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .share-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .share-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .share-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .copy-section {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 14px;
+        }
+
+        .url-input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .copy-btn.copied {
+            background: #4ecdc4;
+        }
+
+        .qr-section {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .qr-code {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .qr-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .qr-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin: 15px 0;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📁 File Share</h1>
+        <p style="color: #666; margin-bottom: 30px;">Upload your files and get a shareable download link</p>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">☁️</div>
+            <div class="upload-text">Click to upload files or drag & drop</div>
+            <div class="upload-subtext">Maximum 10 files, 50MB per file</div>
+        </div>
+
+        <input type="file" id="fileInput" multiple accept="*/*">
+
+        <div class="file-list" id="fileList"></div>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <button class="btn" id="uploadBtn" style="display: none;">Upload Files</button>
+        <button class="btn" id="clearBtn" style="display: none;">Clear Files</button>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const result = document.getElementById('result');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+
+        let selectedFiles = [];
+
+        // Click to upload
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            displayFiles();
+            uploadBtn.style.display = selectedFiles.length > 0 ? 'inline-block' : 'none';
+            clearBtn.style.display = selectedFiles.length > 0 ? 'inline-block' : 'none';
+            result.style.display = 'none';
+        }
+
+        function displayFiles() {
+            fileList.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)}</div>
+                    </div>
+                    <button onclick="removeFile(${index})" style="background: #ff6b6b; color: white; border: none; padding: 5px 10px; border-radius: 15px; cursor: pointer;">×</button>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            displayFiles();
+            uploadBtn.style.display = selectedFiles.length > 0 ? 'inline-block' : 'none';
+            clearBtn.style.display = selectedFiles.length > 0 ? 'inline-block' : 'none';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Upload files
+        uploadBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            uploadBtn.classList.add('loading');
+            progress.style.display = 'block';
+            result.style.display = 'none';
+
+            try {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = percentComplete + '%';
+                    }
+                });
+
+                const response = await new Promise((resolve, reject) => {
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            resolve(JSON.parse(xhr.responseText));
+                        } else {
+                            reject(new Error(xhr.responseText));
+                        }
+                    };
+                    xhr.onerror = () => reject(new Error('Upload failed'));
+                    xhr.open('POST', '/upload');
+                    xhr.send(formData);
+                });
+
+                const fullDownloadUrl = window.location.origin + response.downloadLink;
+                showResult('success', `
+                    <h3>✅ Upload Successful!</h3>
+                    <p>Your files have been uploaded successfully.</p>
+                    <p><strong>Files:</strong> ${response.files.map(f => f.name).join(', ')}</p>
+                    <a href="${response.downloadLink}" class="download-link" target="_blank">
+                        📥 Download Files
+                    </a>
+                    
+                    <div class="share-section">
+                        <h4 style="margin-bottom: 15px; font-size: 16px;">📤 Share this link</h4>
+                        
+                        <div class="copy-section">
+                            <input type="text" class="url-input" value="${fullDownloadUrl}" readonly id="shareUrl">
+                            <button class="copy-btn" onclick="copyToClipboard('${fullDownloadUrl}')" id="copyBtn">
+                                📋 Copy
+                            </button>
+                        </div>
+                        
+
+                        
+                        <div class="qr-section">
+                            <button class="qr-toggle" onclick="toggleQR('${fullDownloadUrl}')">
+                                📱 Show QR Code
+                            </button>
+                            <div id="qrCode" style="display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <p style="margin-top: 15px; font-size: 12px; opacity: 0.8;">
+                        Files will be deleted after 24 hours.
+                    </p>
+                `);
+
+                // Clear files after successful upload
+                selectedFiles = [];
+                displayFiles();
+                fileInput.value = '';
+
+            } catch (error) {
+                showResult('error', `
+                    <h3>❌ Upload Failed</h3>
+                    <p>${error.message}</p>
+                `);
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Files';
+                uploadBtn.classList.remove('loading');
+                uploadBtn.style.display = 'none';
+                clearBtn.style.display = 'none';
+                progress.style.display = 'none';
+                progressBar.style.width = '0%';
+            }
+        });
+
+        // Clear files
+        clearBtn.addEventListener('click', () => {
+            selectedFiles = [];
+            displayFiles();
+            fileInput.value = '';
+            uploadBtn.style.display = 'none';
+            clearBtn.style.display = 'none';
+            result.style.display = 'none';
+        });
+
+        function showResult(type, content) {
+            result.className = `result ${type}`;
+            result.innerHTML = content;
+            result.style.display = 'block';
+        }
+
+        // Copy to clipboard function
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const copyBtn = document.getElementById('copyBtn');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Copied!';
+                copyBtn.classList.add('copied');
+
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+
+                const copyBtn = document.getElementById('copyBtn');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Copied!';
+                copyBtn.classList.add('copied');
+
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            }
+        }
+
+        // QR Code functionality
+        function toggleQR(url) {
+            const qrCode = document.getElementById('qrCode');
+            const button = event.target;
+
+            if (qrCode.style.display === 'none') {
+                // Generate QR code using QR Server API
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+                qrCode.innerHTML = `<div class="qr-code"><img src="${qrUrl}" alt="QR Code" style="max-width: 200px; height: auto;"></div>`;
+                qrCode.style.display = 'block';
+                button.textContent = '🔼 Hide QR Code';
+            } else {
+                qrCode.style.display = 'none';
+                button.textContent = '📱 Show QR Code';
+            }
+        }
+
+        // Native sharing API for mobile devices
+        function shareNative(url, title = 'Download Files') {
+            if (navigator.share) {
+                navigator.share({
+                    title: title,
+                    text: 'Download files from this link:',
+                    url: url
+                }).catch((error) => {
+                    console.log('Error sharing:', error);
+                });
+            }
+        }
+
+        // Add native share button for supported devices
+        document.addEventListener('DOMContentLoaded', () => {
+            if (navigator.share) {
+                // Native sharing is supported, we can add a native share button when needed
+                console.log('Native sharing supported');
+            }
+        });
+    </script>
+</body>
+
+</html>
