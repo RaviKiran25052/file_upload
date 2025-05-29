@@ -31,6 +31,25 @@
             max-width: 600px;
             width: 100%;
             text-align: center;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+                border-radius: 15px;
+                max-width: calc(100% - 20px);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+                margin: 5px;
+                border-radius: 12px;
+                max-width: calc(100% - 10px);
+            }
         }
 
         h1 {
@@ -38,6 +57,20 @@
             margin-bottom: 30px;
             font-size: 2.5em;
             font-weight: 300;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+                margin-bottom: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.8em;
+                margin-bottom: 15px;
+            }
         }
 
         .upload-area {
@@ -48,6 +81,22 @@
             transition: all 0.3s ease;
             cursor: pointer;
             background: linear-gradient(45deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+        }
+
+        @media (max-width: 768px) {
+            .upload-area {
+                padding: 30px 15px;
+                margin: 20px 0;
+                border-width: 2px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .upload-area {
+                padding: 25px 10px;
+                margin: 15px 0;
+                border-radius: 12px;
+            }
         }
 
         .upload-area:hover {
@@ -78,6 +127,38 @@
             font-size: 14px;
         }
 
+        @media (max-width: 768px) {
+            .upload-icon {
+                font-size: 40px;
+                margin-bottom: 12px;
+            }
+
+            .upload-text {
+                font-size: 16px;
+                margin-bottom: 8px;
+            }
+
+            .upload-subtext {
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .upload-icon {
+                font-size: 36px;
+                margin-bottom: 10px;
+            }
+
+            .upload-text {
+                font-size: 15px;
+                margin-bottom: 6px;
+            }
+
+            .upload-subtext {
+                font-size: 12px;
+            }
+        }
+
         #fileInput {
             display: none;
         }
@@ -93,6 +174,26 @@
             transition: all 0.3s ease;
             margin: 10px;
             min-width: 120px;
+        }
+
+        @media (max-width: 768px) {
+            .btn {
+                padding: 12px 24px;
+                font-size: 15px;
+                margin: 8px;
+                min-width: 100px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+                margin: 5px;
+                min-width: 90px;
+                width: 100%;
+                max-width: 200px;
+            }
         }
 
         .btn:hover {
@@ -119,6 +220,22 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 480px) {
+            .file-item {
+                padding: 8px 12px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .file-item button {
+                align-self: flex-end;
+                padding: 3px 8px;
+                font-size: 12px;
+            }
         }
 
         .file-name {
@@ -206,6 +323,14 @@
             display: flex;
             gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 480px) {
+            .copy-section {
+                flex-direction: column;
+                gap: 8px;
+            }
         }
 
         .url-input {
@@ -216,6 +341,16 @@
             background: rgba(255, 255, 255, 0.2);
             color: white;
             font-size: 14px;
+            min-width: 200px;
+        }
+
+        @media (max-width: 480px) {
+            .url-input {
+                width: 100%;
+                min-width: unset;
+                padding: 10px 12px;
+                font-size: 13px;
+            }
         }
 
         .url-input::placeholder {
@@ -237,6 +372,15 @@
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 14px;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 480px) {
+            .copy-btn {
+                width: 100%;
+                padding: 10px 16px;
+                font-size: 13px;
+            }
         }
 
         .copy-btn:hover {
@@ -258,6 +402,19 @@
             border-radius: 10px;
             display: inline-block;
             margin-top: 10px;
+            max-width: 100%;
+        }
+
+        .qr-code img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        @media (max-width: 480px) {
+            .qr-code {
+                padding: 10px;
+                margin-top: 8px;
+            }
         }
 
         .qr-toggle {
@@ -269,6 +426,13 @@
             cursor: pointer;
             font-size: 12px;
             transition: all 0.3s ease;
+        }
+
+        @media (max-width: 480px) {
+            .qr-toggle {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
         }
 
         .qr-toggle:hover {
