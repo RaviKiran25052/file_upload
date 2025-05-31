@@ -1,243 +1,217 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const multer = require('multer');
+const crypto = require('crypto');
 const path = require('path');
-const fs = require('fs');
 const archiver = require('archiver');
-const { v4: uuidv4 } = require('uuid');
-const { MongoClient } = require('mongodb');
+const { GridFSBucket } = require('mongodb');
 
 const app = express();
 const PORT = 5432;
 
-// MongoDB configuration
-const MONGODB_URI = 'mongodb+srv://helodr:helodr@cluster0.l0mrggc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = 'mongodb+srv://helodr:helodr@cluster0.l0mrggc.mongodb.net/fileupload?retryWrites=true&w=majority&appName=Cluster0';
 const DB_NAME = 'fileupload';
 const COLLECTION_NAME = 'uploads';
 
-let db;
-let uploadsCollection;
+let gfs, uploadsCollection;
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-	fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-	destination: (req, file, cb) => {
-		cb(null, uploadsDir);
-	},
-	filename: (req, file, cb) => {
-		const uniqueId = uuidv4();
-		const ext = path.extname(file.originalname);
-		const name = path.basename(file.originalname, ext);
-		cb(null, `${uniqueId}_${name}${ext}`);
-	}
-});
-
-const upload = multer({
-	storage: storage,
-	limits: {
-		fileSize: 50 * 1024 * 1024 // 50MB limit
-	}
-});
-
-// Serve static files
-app.use(express.static('public'));
 app.use(express.json());
 
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI);
+const conn = mongoose.connection;
+
+conn.once('open', async () => {
+  console.log('MongoDB connected via Mongoose');
+
+  // Initialize GridFS Bucket
+  gfs = new GridFSBucket(conn.db, {
+    bucketName: 'uploads'
+  });
+
+  // Get collection reference
+  uploadsCollection = conn.db.collection(COLLECTION_NAME);
+
+  // Create TTL index
+  await uploadsCollection.createIndex({ uploadDate: 1 }, { expireAfterSeconds: 86400 });
+
+  app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+  });
+});
+
+// Custom storage engine for multer
+const storage = multer.diskStorage({
+  filename: (req, file, cb) => {
+    crypto.randomBytes(16, (err, buf) => {
+      if (err) return cb(err);
+      const filename = buf.toString('hex') + path.extname(file.originalname);
+      cb(null, filename);
+    });
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+});
+
+// Error handling
+conn.on('error', err => {
+  console.error('MongoDB connection error:', err);
+});
+
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  process.exit(0);
+});
+
+// Routes
 // Serve the main HTML page
 app.get('/', (req, res) => {
 	res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Upload handler
 app.post('/upload', upload.array('files', 10), async (req, res) => {
-	try {
-		if (!req.files || req.files.length === 0) {
-			return res.status(400).json({ error: 'No files uploaded' });
-		}
+  try {
+    const uploadId = crypto.randomUUID();
+    const files = [];
 
-		const uploadId = uuidv4();
-		const uploadData = {
-			id: uploadId,
-			files: req.files.map(file => ({
-				originalName: file.originalname,
-				filename: file.filename,
-				size: file.size,
-				mimetype: file.mimetype
-			})),
-			uploadDate: new Date(),
-			downloadCount: 0
-		};
+    // Process each file and store in GridFS
+    for (const file of req.files) {
+      const readStream = require('fs').createReadStream(file.path);
+      const uploadStream = gfs.openUploadStream(file.filename, {
+        metadata: {
+          originalName: file.originalname,
+          mimetype: file.mimetype
+        }
+      });
 
-		// Store in MongoDB
-		await uploadsCollection.insertOne(uploadData);
+      const fileInfo = await new Promise((resolve, reject) => {
+        readStream.pipe(uploadStream)
+          .on('error', reject)
+          .on('finish', () => {
+            resolve({
+              originalName: file.originalname,
+              storageName: file.filename,
+              mimetype: file.mimetype,
+              size: file.size,
+              fileId: uploadStream.id
+            });
+          });
+      });
 
-		const downloadLink = `/download/${uploadId}`;
+      files.push(fileInfo);
+      require('fs').unlinkSync(file.path); // Remove temp file
+    }
 
-		res.json({
-			success: true,
-			uploadId,
-			downloadLink,
-			files: uploadData.files.map(f => ({
-				name: f.originalName,
-				size: f.size
-			}))
-		});
-	} catch (error) {
-		console.error('Upload error:', error);
-		res.status(500).json({ error: 'Upload failed' });
-	}
+    await uploadsCollection.insertOne({
+      id: uploadId,
+      files,
+      uploadDate: new Date(),
+      downloadCount: 0
+    });
+
+    res.json({
+      success: true,
+      uploadId,
+      downloadLink: `/download/${uploadId}`,
+      files: files.map(f => ({ name: f.originalName, size: f.size }))
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Upload failed' });
+  }
 });
 
-// Download handler
 app.get('/download/:uploadId', async (req, res) => {
-	const uploadId = req.params.uploadId;
+  try {
+    const upload = await uploadsCollection.findOne({ 
+      id: req.params.uploadId 
+    });
+    
+    if (!upload) {
+      return res.status(404).send('Upload not found');
+    }
 
-	try {
-		const uploadData = await uploadsCollection.findOne({ id: uploadId });
+    await uploadsCollection.updateOne(
+      { id: upload.id },
+      { $inc: { downloadCount: 1 } }
+    );
 
-		if (!uploadData) {
-			return res.status(404).send('Files not found or expired');
-		}
+    if (upload.files.length === 1) {
+      const file = upload.files[0];
+      const downloadStream = gfs.openDownloadStream(file.fileId);
+      
+      downloadStream.on('error', () => {
+        res.status(404).send('File not found');
+      });
 
-		// If single file, send it directly
-		if (uploadData.files.length === 1) {
-			const file = uploadData.files[0];
-			const filePath = path.join(uploadsDir, file.filename);
-
-			if (!fs.existsSync(filePath)) {
-				return res.status(404).send('File not found');
-			}
-
-			await uploadsCollection.updateOne({ id: uploadId }, { $inc: { downloadCount: 1 } });
-			res.download(filePath, file.originalName);
-		} else {
-			// Create ZIP for multiple files
-			const zipName = `files_${uploadId}.zip`;
-			res.setHeader('Content-Type', 'application/zip');
-			res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
-
-			const archive = archiver('zip', { zlib: { level: 9 } });
-
-			archive.on('error', err => {
-				console.error('Archive error:', err);
-				res.status(500).send('Error creating zip file');
-			});
-
-			archive.pipe(res);
-
-			for (const file of uploadData.files) {
-				const filePath = path.join(uploadsDir, file.filename);
-				if (fs.existsSync(filePath)) {
-					archive.file(filePath, { name: file.originalName });
-				}
-			}
-
-			await uploadsCollection.updateOne({ id: uploadId }, { $inc: { downloadCount: 1 } });
-
-			await archive.finalize();
-		}
-	} catch (error) {
-		console.error('Download error:', error);
-		res.status(500).send('Download failed');
-	}
+      res.set({
+        'Content-Type': file.mimetype,
+        'Content-Disposition': `attachment; filename="${file.originalName}"`
+      });
+      
+      downloadStream.pipe(res);
+    } else {
+      const zip = archiver('zip');
+      res.set({
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="files_${upload.id}.zip"`
+      });
+      
+      zip.pipe(res);
+      
+      for (const file of upload.files) {
+        const downloadStream = gfs.openDownloadStream(file.fileId);
+        zip.append(downloadStream, { name: file.originalName });
+      }
+      
+      await zip.finalize();
+    }
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).send('Download failed');
+  }
 });
 
-// Get file metadata
+// Keep the /info and /admin/uploads routes from previous example
+
 app.get('/info/:uploadId', async (req, res) => {
-	const uploadId = req.params.uploadId;
+  try {
+    const upload = await uploadsCollection.findOne({ 
+      id: req.params.uploadId 
+    });
+    
+    if (!upload) {
+      return res.status(404).json({ error: 'Upload not found' });
+    }
 
-	try {
-		const uploadData = await uploadsCollection.findOne({ id: uploadId });
-
-		if (!uploadData) {
-			return res.status(404).json({ error: 'Upload not found' });
-		}
-
-		res.json({
-			id: uploadData.id,
-			files: uploadData.files.map(f => ({
-				name: f.originalName,
-				size: f.size,
-				type: f.mimetype
-			})),
-			uploadDate: uploadData.uploadDate,
-			downloadCount: uploadData.downloadCount
-		});
-	} catch (error) {
-		console.error('Info retrieval error:', error);
-		res.status(500).json({ error: 'Failed to retrieve upload info' });
-	}
+    res.json({
+      id: upload.id,
+      files: upload.files.map(f => ({
+        name: f.originalName,
+        size: f.size,
+        type: f.mimetype
+      })),
+      uploadDate: upload.uploadDate,
+      downloadCount: upload.downloadCount
+    });
+  } catch (error) {
+    console.error('Info error:', error);
+    res.status(500).json({ error: 'Info retrieval failed' });
+  }
 });
 
-// Manual cleanup (optional)
-app.delete('/cleanup', async (req, res) => {
-	try {
-		const now = new Date();
-		const cutoffDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours
-
-		const expiredUploads = await uploadsCollection.find({
-			uploadDate: { $lt: cutoffDate }
-		}).toArray();
-
-		for (const upload of expiredUploads) {
-			upload.files.forEach(file => {
-				const filePath = path.join(uploadsDir, file.filename);
-				if (fs.existsSync(filePath)) {
-					fs.unlinkSync(filePath);
-				}
-			});
-		}
-
-		const deleteResult = await uploadsCollection.deleteMany({
-			uploadDate: { $lt: cutoffDate }
-		});
-
-		res.json({
-			success: true,
-			deletedCount: deleteResult.deletedCount,
-			message: `Cleaned up ${deleteResult.deletedCount} expired uploads`
-		});
-	} catch (error) {
-		console.error('Cleanup error:', error);
-		res.status(500).json({ error: 'Cleanup failed' });
-	}
-});
-
-// Admin route: get all uploads
 app.get('/admin/uploads', async (req, res) => {
-	try {
-		const uploads = await uploadsCollection.find({}).sort({ uploadDate: -1 }).toArray();
-		res.json(uploads);
-	} catch (error) {
-		console.error('Admin retrieval error:', error);
-		res.status(500).json({ error: 'Failed to retrieve uploads' });
-	}
+  try {
+    const uploads = await uploadsCollection.find()
+      .sort({ uploadDate: -1 })
+      .toArray();
+    
+    res.json(uploads);
+  } catch (error) {
+    console.error('Admin error:', error);
+    res.status(500).json({ error: 'Failed to retrieve uploads' });
+  }
 });
-
-// Initialize MongoDB and start server
-async function initMongoDB() {
-	try {
-		const client = new MongoClient(MONGODB_URI);
-		await client.connect();
-
-		db = client.db(DB_NAME);
-		uploadsCollection = db.collection(COLLECTION_NAME);
-
-		await uploadsCollection.createIndex({ id: 1 });
-		await uploadsCollection.createIndex({ uploadDate: 1 }, { expireAfterSeconds: 86400 });
-
-		console.log('Connected to MongoDB successfully');
-		app.listen(PORT, () => {
-			console.log(`Server running at http://localhost:${PORT}`);
-		});
-	} catch (error) {
-		console.error('MongoDB connection error:', error);
-		process.exit(1);
-	}
-}
-
-initMongoDB();
