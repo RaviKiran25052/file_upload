@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const path = require('path');
 const archiver = require('archiver');
 const { GridFSBucket } = require('mongodb');
+const cors = require("cors");
 
 const app = express();
 const PORT = 5432;
@@ -16,6 +17,7 @@ const COLLECTION_NAME = 'uploads';
 let gfs, uploadsCollection;
 
 app.use(express.json());
+app.use(cors('*'));
 
 // Connect to MongoDB
 mongoose.connect(MONGODB_URI);
